@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* 온톨로지 그래프 색상 (dataviz 스킬 카테고리 팔레트 기준) */
+  --node-sector: #2a78d6;
+  --node-industry: #eb6834;
+  --node-asset: #1baf7a;
+  --node-concept: #eda100;
+  --node-selected-ring: #171717;
+
+  --edge-default: #c3c2b7;
+  --edge-positive: #0ca30c;
+  --edge-negative: #d03b3b;
+  --edge-mixed: #898781;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+
+    --node-sector: #3987e5;
+    --node-industry: #d95926;
+    --node-asset: #199e70;
+    --node-concept: #c98500;
+    --node-selected-ring: #ededed;
+
+    --edge-default: #383835;
+    --edge-positive: #0ca30c;
+    --edge-negative: #e66767;
+    --edge-mixed: #898781;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
