@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { computeVisibleGraphData, getConnectedNodeIds } from "@/lib/graph";
+import { getNodeIcon } from "@/lib/nodeIcons";
 import { OntologyEdge, OntologyNode, Polarity } from "@/lib/types";
 
 // 캔버스 기반 라이브러리라 브라우저에서만 그릴 수 있다 (서버 렌더링 불가).
@@ -15,12 +16,21 @@ const NODE_COLOR: Record<OntologyNode["type"], string> = {
   Concept: "var(--node-concept)",
 };
 
+// 실제 화면에 그려지는 반지름(px). react-force-graph-2d는 nodeVal이 아니라
+// r = sqrt(nodeVal) * nodeRelSize 공식으로 반지름을 정하므로, nodeVal 쪽에서 역산한다.
+const NODE_REL_SIZE = 4; // ForceGraph2D의 nodeRelSize prop과 반드시 동일하게 유지
 const NODE_RADIUS: Record<OntologyNode["type"], number> = {
-  Sector: 10,
-  Industry: 7,
-  Asset: 6,
-  Concept: 8,
+  Sector: 14,
+  Industry: 10,
+  Asset: 9,
+  Concept: 11,
 };
+
+function nodeValFromRadius(type: OntologyNode["type"]): number {
+  return (NODE_RADIUS[type] / NODE_REL_SIZE) ** 2;
+}
+
+const ICON_FONT_FAMILY = '"Material Symbols Outlined"';
 
 function polarityColor(polarity: Polarity | undefined): string {
   if (polarity === "positive") return "var(--edge-positive)";
@@ -58,35 +68,81 @@ export default function GraphView({
     [selectedNodeId]
   );
 
+  // 아이콘 폰트가 준비되기 전에 그래프를 그리면 아이콘이 빈 사각형(tofu)으로 나왔다가
+  // 뒤늦게 나타나면서 노드가 흔들린다. 폰트를 먼저 기다렸다가 그래프를 마운트한다.
+  const [fontsReady, setFontsReady] = useState(false);
+  useEffect(() => {
+    if (typeof document === "undefined" || !("fonts" in document)) {
+      setFontsReady(true);
+      return;
+    }
+    let cancelled = false;
+    const iconFontLoad = document.fonts.load(`16px ${ICON_FONT_FAMILY}`).catch(() => {});
+    // 폰트 요청이 막히거나 너무 오래 걸리는 경우(네트워크 차단 등) 그래프가
+    // 영영 안 뜨는 걸 막기 위한 타임아웃 안전장치.
+    const timeout = new Promise<void>((resolve) => setTimeout(resolve, 3000));
+    Promise.race([Promise.all([iconFontLoad, document.fonts.ready]), timeout]).then(() => {
+      if (!cancelled) setFontsReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!fontsReady) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-zinc-500 dark:text-zinc-400">
+        그래프 불러오는 중…
+      </div>
+    );
+  }
+
   return (
     <ForceGraph2D
       graphData={graphData as never}
       nodeId="id"
       nodeLabel={(node) => (node as OntologyNode).name}
-      nodeRelSize={4}
-      nodeVal={(node) => NODE_RADIUS[(node as OntologyNode).type]}
+      nodeRelSize={NODE_REL_SIZE}
+      nodeVal={(node) => nodeValFromRadius((node as OntologyNode).type)}
       nodeColor={(node) => resolveColor(NODE_COLOR[(node as OntologyNode).type])}
       nodeCanvasObjectMode={() => "after"}
       nodeCanvasObject={(node, ctx, globalScale) => {
         const n = node as OntologyNode & { x: number; y: number };
         const isSelected = n.id === selectedNodeId;
         const isDimmed = selectedNodeId !== null && !isSelected && !connectedIds.has(n.id);
+        const radius = NODE_RADIUS[n.type];
 
         if (isSelected) {
           ctx.beginPath();
-          ctx.arc(n.x, n.y, NODE_RADIUS[n.type] + 3, 0, 2 * Math.PI);
+          ctx.arc(n.x, n.y, radius + 3, 0, 2 * Math.PI);
           ctx.strokeStyle = resolveColor("var(--node-selected-ring)");
           ctx.lineWidth = 2;
           ctx.stroke();
         }
 
+        ctx.globalAlpha = isDimmed ? 0.35 : 1;
+
+        // 배지 안쪽: 아이콘(Sector/Industry/Concept) 또는 티커 앞 두 글자(Asset).
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#ffffff";
+        if (n.type === "Asset") {
+          const tickerText = (n.ticker ?? n.name).slice(0, 2).toUpperCase();
+          ctx.font = `bold ${radius * 0.85}px sans-serif`;
+          ctx.fillText(tickerText, n.x, n.y);
+        } else {
+          const icon = getNodeIcon(n);
+          if (icon) {
+            ctx.font = `${radius * 1.15}px ${ICON_FONT_FAMILY}`;
+            ctx.fillText(icon, n.x, n.y);
+          }
+        }
+
         const fontSize = 12 / globalScale;
         ctx.font = `${fontSize}px sans-serif`;
-        ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        ctx.globalAlpha = isDimmed ? 0.35 : 1;
         ctx.fillStyle = resolveColor("var(--foreground)");
-        ctx.fillText(n.name, n.x, n.y + NODE_RADIUS[n.type] + 2);
+        ctx.fillText(n.name, n.x, n.y + radius + 2);
         ctx.globalAlpha = 1;
       }}
       linkSource="source"
