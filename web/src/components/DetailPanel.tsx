@@ -1,7 +1,6 @@
 "use client";
 
 import { getConnectedEdges } from "@/lib/graph";
-import { nodeById } from "@/lib/mockData";
 import { OntologyEdge, OntologyNode } from "@/lib/types";
 
 const SENTIMENT_LABEL: Record<string, string> = {
@@ -18,11 +17,13 @@ const POLARITY_LABEL: Record<string, string> = {
 
 interface DetailPanelProps {
   node: OntologyNode | null;
+  edges: OntologyEdge[];
+  nodeById: Map<string, OntologyNode>;
   onJumpToNode: (id: string) => void;
   onClose: () => void;
 }
 
-export default function DetailPanel({ node, onJumpToNode, onClose }: DetailPanelProps) {
+export default function DetailPanel({ node, edges, nodeById, onJumpToNode, onClose }: DetailPanelProps) {
   if (!node) {
     return (
       <aside className="w-80 shrink-0 border-l border-black/10 p-4 text-sm text-zinc-500 dark:border-white/10 dark:text-zinc-400">
@@ -31,7 +32,7 @@ export default function DetailPanel({ node, onJumpToNode, onClose }: DetailPanel
     );
   }
 
-  const relations = getConnectedEdges(node.id)
+  const relations = getConnectedEdges(edges, node.id)
     .map((edge) => {
       const otherId = edge.source === node.id ? edge.target : edge.source;
       const other = nodeById.get(otherId);

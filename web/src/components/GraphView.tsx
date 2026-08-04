@@ -48,6 +48,8 @@ function resolveColor(cssVarExpr: string): string {
 }
 
 interface GraphViewProps {
+  nodes: OntologyNode[];
+  edges: OntologyEdge[];
   expandedIds: Set<string>;
   selectedNodeId: string | null;
   onToggleExpand: (id: string) => void;
@@ -56,32 +58,35 @@ interface GraphViewProps {
 }
 
 export default function GraphView({
+  nodes,
+  edges,
   expandedIds,
   selectedNodeId,
   onToggleExpand,
   onSelectNode,
   onBackgroundClick,
 }: GraphViewProps) {
-  const graphData = useMemo(() => computeVisibleGraphData(expandedIds), [expandedIds]);
+  const graphData = useMemo(() => computeVisibleGraphData(nodes, edges, expandedIds), [nodes, edges, expandedIds]);
   const connectedIds = useMemo(
-    () => (selectedNodeId ? getConnectedNodeIds(selectedNodeId) : new Set<string>()),
-    [selectedNodeId]
+    () => (selectedNodeId ? getConnectedNodeIds(edges, selectedNodeId) : new Set<string>()),
+    [edges, selectedNodeId]
   );
 
   // 아이콘 폰트가 준비되기 전에 그래프를 그리면 아이콘이 빈 사각형(tofu)으로 나왔다가
   // 뒤늦게 나타나면서 노드가 흔들린다. 폰트를 먼저 기다렸다가 그래프를 마운트한다.
   const [fontsReady, setFontsReady] = useState(false);
   useEffect(() => {
-    if (typeof document === "undefined" || !("fonts" in document)) {
-      setFontsReady(true);
-      return;
-    }
     let cancelled = false;
-    const iconFontLoad = document.fonts.load(`16px ${ICON_FONT_FAMILY}`).catch(() => {});
-    // 폰트 요청이 막히거나 너무 오래 걸리는 경우(네트워크 차단 등) 그래프가
-    // 영영 안 뜨는 걸 막기 위한 타임아웃 안전장치.
-    const timeout = new Promise<void>((resolve) => setTimeout(resolve, 3000));
-    Promise.race([Promise.all([iconFontLoad, document.fonts.ready]), timeout]).then(() => {
+    const fontsSupported = typeof document !== "undefined" && "fonts" in document;
+    const ready = fontsSupported
+      ? Promise.race([
+          Promise.all([document.fonts.load(`16px ${ICON_FONT_FAMILY}`).catch(() => {}), document.fonts.ready]),
+          // 폰트 요청이 막히거나 너무 오래 걸리는 경우(네트워크 차단 등) 그래프가
+          // 영영 안 뜨는 걸 막기 위한 타임아웃 안전장치.
+          new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+        ])
+      : Promise.resolve();
+    ready.then(() => {
       if (!cancelled) setFontsReady(true);
     });
     return () => {
