@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "collect": "node --env-file=.env.local scripts/collect.mts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.0",
