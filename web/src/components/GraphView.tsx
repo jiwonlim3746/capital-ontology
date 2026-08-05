@@ -1,13 +1,19 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ForceGraphMethods } from "react-force-graph-2d";
 import { computeVisibleGraphData, getConnectedNodeIds } from "@/lib/graph";
 import { getNodeIcon } from "@/lib/nodeIcons";
 import { OntologyEdge, OntologyNode, Polarity } from "@/lib/types";
 
 // 캔버스 기반 라이브러리라 브라우저에서만 그릴 수 있다 (서버 렌더링 불가).
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
+
+interface LogoCacheEntry {
+  img: HTMLImageElement;
+  status: "loading" | "loaded" | "error";
+}
 
 const NODE_COLOR: Record<OntologyNode["type"], string> = {
   Sector: "var(--node-sector)",
@@ -72,6 +78,41 @@ export default function GraphView({
     [edges, selectedNodeId]
   );
 
+  const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
+  // 종목 로고 이미지를 URL별로 한 번만 로드해서 재사용한다 (스펙 3.4: "캐시해서 매번 다시 안 받게").
+  // ref에 담는 이유: 캐시가 바뀐다고 리렌더링이 필요한 게 아니라 캔버스만 다시 그리면 되기 때문.
+  const logoCacheRef = useRef<Map<string, LogoCacheEntry>>(new Map());
+  const repaintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 로고 이미지가 뒤늦게 로드됐을 때 화면에 반영되도록 리페인트를 예약한다.
+  // 여러 이미지가 짧은 시간 안에 로드되면 한 번만 리페인트하도록 묶는다(디바운스).
+  function scheduleRepaint() {
+    if (repaintTimeoutRef.current) return;
+    repaintTimeoutRef.current = setTimeout(() => {
+      repaintTimeoutRef.current = null;
+      fgRef.current?.d3ReheatSimulation();
+    }, 150);
+  }
+
+  function getOrLoadLogo(url: string): LogoCacheEntry {
+    const cache = logoCacheRef.current;
+    const existing = cache.get(url);
+    if (existing) return existing;
+
+    const img = new Image();
+    const entry: LogoCacheEntry = { img, status: "loading" };
+    cache.set(url, entry);
+    img.onload = () => {
+      entry.status = "loaded";
+      scheduleRepaint();
+    };
+    img.onerror = () => {
+      entry.status = "error";
+    };
+    img.src = url;
+    return entry;
+  }
+
   // 아이콘 폰트가 준비되기 전에 그래프를 그리면 아이콘이 빈 사각형(tofu)으로 나왔다가
   // 뒤늦게 나타나면서 노드가 흔들린다. 폰트를 먼저 기다렸다가 그래프를 마운트한다.
   const [fontsReady, setFontsReady] = useState(false);
@@ -104,6 +145,7 @@ export default function GraphView({
 
   return (
     <ForceGraph2D
+      ref={fgRef}
       graphData={graphData as never}
       nodeId="id"
       nodeLabel={(node) => (node as OntologyNode).name}
@@ -127,14 +169,25 @@ export default function GraphView({
 
         ctx.globalAlpha = isDimmed ? 0.35 : 1;
 
-        // 배지 안쪽: 아이콘(Sector/Industry/Concept) 또는 티커 앞 두 글자(Asset).
+        // 배지 안쪽: 로고 이미지 또는 티커 앞 두 글자(Asset), 아이콘(Sector/Industry/Concept).
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillStyle = "#ffffff";
         if (n.type === "Asset") {
-          const tickerText = (n.ticker ?? n.name).slice(0, 2).toUpperCase();
-          ctx.font = `bold ${radius * 0.85}px sans-serif`;
-          ctx.fillText(tickerText, n.x, n.y);
+          const logo = n.logo ? getOrLoadLogo(n.logo) : null;
+          if (logo?.status === "loaded") {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, radius, 0, 2 * Math.PI);
+            ctx.clip();
+            ctx.drawImage(logo.img, n.x - radius, n.y - radius, radius * 2, radius * 2);
+            ctx.restore();
+          } else {
+            // 로고가 없거나(logo 필드 없음), 아직 로딩 중이거나, 로드에 실패한 경우 폴백.
+            const tickerText = (n.ticker ?? n.name).slice(0, 2).toUpperCase();
+            ctx.font = `bold ${radius * 0.85}px sans-serif`;
+            ctx.fillText(tickerText, n.x, n.y);
+          }
         } else {
           const icon = getNodeIcon(n);
           if (icon) {

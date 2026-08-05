@@ -12,6 +12,7 @@ interface NodeRow {
   company_summary: string | null;
   ceo: string | null;
   market_cap: string | null;
+  logo: string | null;
   news: NewsItem[] | null;
   outlook: Outlook | null;
   category: NonNullable<OntologyNode["category"]> | null;
@@ -41,6 +42,7 @@ function toNode(row: NodeRow): OntologyNode {
     companySummary: row.company_summary ?? undefined,
     ceo: row.ceo ?? undefined,
     marketCap: row.market_cap ?? undefined,
+    logo: row.logo ?? undefined,
     news: row.news && row.news.length > 0 ? row.news : undefined,
     outlook: row.outlook ?? undefined,
     category: row.category ?? undefined,

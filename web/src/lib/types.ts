@@ -30,6 +30,7 @@ export interface OntologyNode {
   companySummary?: string;
   ceo?: string;
   marketCap?: string;
+  logo?: string;
   news?: NewsItem[];
   outlook?: Outlook;
   // Concept 노드 카테고리
