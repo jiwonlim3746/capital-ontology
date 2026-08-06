@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "collect": "node --env-file=.env.local scripts/collect.mts"
+    "collect": "node --env-file=.env.local scripts/collect.mts",
+    "generate-outlook": "node --env-file=.env.local scripts/generate-outlook.mts"
   },
   "dependencies": {
+    "@google/genai": "^2.16.0",
     "@supabase/supabase-js": "^2.112.0",
     "next": "16.2.12",
     "react": "19.2.4",
