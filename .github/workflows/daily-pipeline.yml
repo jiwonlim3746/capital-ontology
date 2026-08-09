@@ -1,0 +1,33 @@
+name: 일일 데이터 파이프라인
+
+on:
+  schedule:
+    - cron: "0 22 * * *" # 매일 한국 시간(KST, UTC+9) 오전 7시
+  workflow_dispatch: {} # Actions 탭에서 수동 실행도 가능하게
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    env:
+      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: 1단계 - 주가·뉴스·로고 수집 (Finnhub)
+        run: node scripts/collect.mts
+
+      - name: 2단계 - 종목 전망 생성 (Gemini)
+        run: node scripts/generate-outlook.mts
