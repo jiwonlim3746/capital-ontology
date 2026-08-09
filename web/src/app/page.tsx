@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import GraphView from "@/components/GraphView";
 import DetailPanel from "@/components/DetailPanel";
+import SearchBar from "@/components/SearchBar";
 import { computeAncestorChain } from "@/lib/graph";
 import { fetchOntology } from "@/lib/ontologyData";
 import { OntologyEdge, OntologyNode } from "@/lib/types";
@@ -15,6 +16,7 @@ export default function Home() {
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOntology()
@@ -54,6 +56,7 @@ export default function Home() {
   const jumpToNode = (id: string) => {
     setExpandedIds((prev) => new Set([...prev, ...computeAncestorChain(edges, id)]));
     setSelectedNodeId(id);
+    setPendingFocusId(id);
   };
 
   const selectedNode = selectedNodeId ? (nodeById.get(selectedNodeId) ?? null) : null;
@@ -80,6 +83,9 @@ export default function Home() {
         <div className="pointer-events-none absolute left-4 top-4 z-10 text-xs text-zinc-500 dark:text-zinc-400">
           섹터·산업 노드를 클릭하면 하위 노드가 펼쳐집니다. 종목을 클릭하면 오른쪽에 상세 정보가 뜹니다.
         </div>
+        <div className="absolute right-4 top-4 z-20">
+          <SearchBar nodes={nodes} onSelect={jumpToNode} />
+        </div>
         <GraphView
           nodes={nodes}
           edges={edges}
@@ -88,6 +94,8 @@ export default function Home() {
           onToggleExpand={toggleExpand}
           onSelectNode={setSelectedNodeId}
           onBackgroundClick={() => setSelectedNodeId(null)}
+          focusNodeId={pendingFocusId}
+          onFocusHandled={() => setPendingFocusId(null)}
         />
       </main>
       <DetailPanel

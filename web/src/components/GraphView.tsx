@@ -61,6 +61,8 @@ interface GraphViewProps {
   onToggleExpand: (id: string) => void;
   onSelectNode: (id: string) => void;
   onBackgroundClick: () => void;
+  focusNodeId: string | null;
+  onFocusHandled: () => void;
 }
 
 export default function GraphView({
@@ -71,6 +73,8 @@ export default function GraphView({
   onToggleExpand,
   onSelectNode,
   onBackgroundClick,
+  focusNodeId,
+  onFocusHandled,
 }: GraphViewProps) {
   const graphData = useMemo(() => computeVisibleGraphData(nodes, edges, expandedIds), [nodes, edges, expandedIds]);
   const connectedIds = useMemo(
@@ -134,6 +138,28 @@ export default function GraphView({
       cancelled = true;
     };
   }, []);
+
+  // 검색·관계 클릭으로 "점프"했을 때만 카메라를 따라가게 한다. 일반 클릭은 마우스가
+  // 이미 그 자리에 있어서 화면이 움직이면 오히려 방해가 되므로 여기서 제외한다.
+  // 방금 펼쳐진 노드가 위치를 잡을 시간을 조금 준 뒤(300ms) 그 위치로 카메라를 이동한다.
+  // zoomToFit은 노드 하나만 기준으로 하면 그 노드에 지나치게 확대돼버려서(경계 상자가
+  // 점 하나라 화면을 거의 다 채움), 확대 배율은 그대로 두고 위치만 옮기는
+  // getGraphBbox + centerAt 조합을 쓴다.
+  useEffect(() => {
+    if (!focusNodeId) return;
+    const timeout = setTimeout(() => {
+      const bbox = fgRef.current?.getGraphBbox((node) => (node as unknown as { id: string }).id === focusNodeId);
+      if (bbox) {
+        const x = (bbox.x[0] + bbox.x[1]) / 2;
+        const y = (bbox.y[0] + bbox.y[1]) / 2;
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+          fgRef.current?.centerAt(x, y, 400);
+        }
+      }
+      onFocusHandled();
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [focusNodeId, onFocusHandled]);
 
   if (!fontsReady) {
     return (
