@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# AI 생성 스크립트 미리보기(검토용, 커밋 대상 아님)
+scripts/generate-affects-preview.json

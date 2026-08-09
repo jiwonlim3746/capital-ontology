@@ -149,12 +149,19 @@ export default function DetailPanel({ node, edges, nodeById, onJumpToNode, onClo
           <ul className="space-y-2">
             {relations.map(({ edge, other }) => (
               <li key={edge.id}>
-                <button
-                  onClick={() => onJumpToNode(other.id)}
-                  className="font-medium text-left hover:underline"
-                >
-                  {other.name}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onJumpToNode(other.id)}
+                    className="font-medium text-left hover:underline"
+                  >
+                    {other.name}
+                  </button>
+                  {edge.type === "AFFECTS" && (
+                    <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900 dark:text-violet-200">
+                      AI 생성
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
                   {edge.type}
                   {edge.polarity ? ` · ${POLARITY_LABEL[edge.polarity]}` : ""}

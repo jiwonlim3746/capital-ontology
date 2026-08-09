@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "collect": "node --env-file=.env.local scripts/collect.mts",
-    "generate-outlook": "node --env-file=.env.local scripts/generate-outlook.mts"
+    "generate-outlook": "node --env-file=.env.local scripts/generate-outlook.mts",
+    "generate-affects": "node --env-file=.env.local scripts/generate-affects.mts"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",
